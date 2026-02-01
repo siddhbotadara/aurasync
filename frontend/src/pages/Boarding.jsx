@@ -11,26 +11,66 @@ const Boarding = () => {
   const [form, setForm] = useState({
     comprehensionBreak: "",
     learningPreference: "",
+    listeningThought: "",
     struggleNote: "",
     uiPreferences: {
       font: "",
-      fontSize: "large",
-      colorMode: ""
+      fontSize: "large"
     }
   });
 
+
+  const isStepValid = () => {
+    switch (step) {
+      case 1:
+        return !!form.comprehensionBreak;
+      case 2:
+        return !!form.learningPreference;
+      case 3:
+        return true; // optional
+      case 4:
+        return !!form.uiPreferences.font;
+      case 5:
+        return !!form.listeningThought;
+      case 6:
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  const isFormValid = () => {
+    return (
+      form.comprehensionBreak &&
+      form.learningPreference &&
+      form.uiPreferences.font &&
+      form.listeningThought
+    );
+  };
+
   const next = () => setStep((s) => s + 1);
-  const back = () => setStep((s) => Math.max(1, s - 1));
+  const back = () => {
+    if (step === 1) {
+      navigate("/");
+    } else {
+      setStep((s) => s - 1);
+    }
+  };
 
   const submit = async () => {
+    if (!isFormValid()) {
+      alert("Please complete all required steps before continuing.");
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await api.post("/onboarding", form);
       localStorage.setItem("aurasync_profile_id", res.data.profileId);
       navigate("/app");
     } catch (err) {
-      alert("Failed to save onboarding");
       console.error(err);
+      alert("Something went wrong while saving. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -72,6 +112,7 @@ const Boarding = () => {
           <>
             <h2 className="text-xl font-semibold">
               Where do you usually lose understanding?
+              <span className="text-red-500"> *</span>
             </h2>
 
             <div className="space-y-3">
@@ -100,6 +141,7 @@ const Boarding = () => {
           <>
             <h2 className="text-xl font-semibold">
               What helps you understand best?
+              <span className="text-red-500"> *</span>
             </h2>
 
             <div className="space-y-3">
@@ -146,6 +188,7 @@ const Boarding = () => {
           <>
             <h2 className="text-xl font-semibold">
               Choose a reading font
+              <span className="text-red-500"> *</span>
             </h2>
 
             <div className="space-y-3">
@@ -179,33 +222,28 @@ const Boarding = () => {
           <>
             <h2 className="text-xl font-semibold">
               When listening, which thought happens more often?
+              <span className="text-red-500"> *</span>
             </h2>
 
             <div className="space-y-3">
               <OptionCard
                 label="“Wait… what did they just say?”"
-                selected={form.uiPreferences.colorMode === "light"}
+                selected={form.listeningThought === "missed_what_was_said"}
                 onClick={() =>
                   setForm({
                     ...form,
-                    uiPreferences: {
-                      ...form.uiPreferences,
-                      colorMode: "light"
-                    }
+                    listeningThought: "missed_what_was_said"
                   })
                 }
               />
 
               <OptionCard
                 label="“I get the words, but not the meaning”"
-                selected={form.uiPreferences.colorMode === "dark"}
+                selected={form.listeningThought === "hear_but_not_understand"}
                 onClick={() =>
                   setForm({
                     ...form,
-                    uiPreferences: {
-                      ...form.uiPreferences,
-                      colorMode: "dark"
-                    }
+                    listeningThought: "hear_but_not_understand"
                   })
                 }
               />
@@ -226,11 +264,10 @@ const Boarding = () => {
         )}
 
         {/* Navigation */}
-        <div className="flex justify-between pt-4">
+        <div className="flex justify-between pt-4 items-center">
           <button
             onClick={back}
-            disabled={step === 1}
-            className="px-4 py-2 rounded-xl border disabled:opacity-40"
+            className="px-4 py-2 rounded-xl border hover:bg-gray-50"
           >
             Back
           </button>
@@ -238,15 +275,26 @@ const Boarding = () => {
           {step < 6 ? (
             <button
               onClick={next}
-              className="px-6 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
+              disabled={!isStepValid()}
+              className={`px-6 py-2 rounded-xl text-white transition
+                ${
+                  isStepValid()
+                    ? "bg-indigo-600 hover:bg-indigo-700"
+                    : "bg-indigo-300 cursor-not-allowed"
+                }`}
             >
               Next
             </button>
           ) : (
             <button
               onClick={submit}
-              disabled={loading}
-              className="px-6 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+              disabled={loading || !isFormValid()}
+              className={`px-6 py-2 rounded-xl text-white transition
+                ${
+                  loading || !isFormValid()
+                    ? "bg-indigo-300 cursor-not-allowed"
+                    : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
             >
               {loading ? "Saving..." : "Enter App"}
             </button>

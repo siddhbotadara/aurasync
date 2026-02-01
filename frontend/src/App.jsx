@@ -14,7 +14,14 @@ const App = () => {
   return (
     <Routes>
       {/* Home */}
-      <Route path="/" element={<HomePage />} />
+      <Route
+        path="/"
+        element={
+          <BlockIfProfileExists>
+            <HomePage />
+          </BlockIfProfileExists>
+        }
+      />
 
       {/* Onboarding (blocked after completion) */}
       <Route

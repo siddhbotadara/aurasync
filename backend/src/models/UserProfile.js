@@ -32,6 +32,15 @@ const UserProfileSchema = new mongoose.Schema(
         required: true
       },
 
+      listeningThought: {
+        type: String,
+        enum: [
+          "missed_what_was_said",
+          "hear_but_not_understand"
+        ],
+        required: true
+      },
+
       struggleNote: {
         type: String,
         default: ""

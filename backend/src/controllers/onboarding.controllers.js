@@ -6,6 +6,7 @@ export const createOnboardingProfile = async (request, reply) => {
     const {
       comprehensionBreak,
       learningPreference,
+      listeningThought,
       struggleNote,
       uiPreferences
     } = request.body;
@@ -15,11 +16,12 @@ export const createOnboardingProfile = async (request, reply) => {
       onboarding: {
         comprehensionBreak,
         learningPreference,
+        listeningThought,
         struggleNote
       },
       uiPreferences
     });
-
+    
     await profile.save();
 
     reply.code(201).send({

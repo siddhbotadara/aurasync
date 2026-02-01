@@ -6,7 +6,7 @@ export const RequireProfile = ({ children }) => {
   return profileId ? children : <Navigate to="/onboarding" replace />;
 };
 
-/* 🚫 Block onboarding after completion */
+/* 🚫 Block onboarding / home after completion */
 export const BlockIfProfileExists = ({ children }) => {
   const profileId = localStorage.getItem("aurasync_profile_id");
   return profileId ? <Navigate to="/app" replace /> : children;

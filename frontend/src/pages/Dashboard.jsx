@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
   Settings,
   HelpCircle,
@@ -12,6 +14,7 @@ const Dashboard = () => {
   const [profileId, setProfileId] = useState(null);
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState(50);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const id = localStorage.getItem("aurasync_profile_id");
@@ -20,7 +23,7 @@ const Dashboard = () => {
 
   const resetProfile = () => {
     localStorage.removeItem("aurasync_profile_id");
-    window.location.href = "/";
+    navigate("/", { replace: true });
   };
 
   return (

@@ -5,42 +5,49 @@ const HomePage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center px-4">
-      <div className="max-w-4xl w-full bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-10 md:p-8 text-center">
+    <div className="w-full min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center px-4 py-6">
+      <div className="w-full max-w-5xl bg-white/95 backdrop-blur rounded-3xl shadow-2xl
+                      p-6 sm:p-8 md:p-10 text-center">
 
-        {/* Logo / Title */}
-        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">
+        {/* Title */}
+        <h1 className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-gray-900 mb-3">
           Welcome to <span className="text-indigo-600">AuraSync</span>
         </h1>
 
-        {/* Subtitle */}
-        <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-          AuraSync is designed for learners with <span className="font-semibold">Auditory Processing Disorder (APD)</span>.
-          When lectures feel confusing, rushed, or hard to retain, AuraSync steps in to present information
-          in a clearer, slower, and more structured way → helping you stay focused, reduce mental overload,
-          and truly understand what’s being taught.
+        {/* Description */}
+        <p className="text-sm sm:text-base md:text-lg text-gray-600 mb-6 max-w-3xl mx-auto">
+          AuraSync helps learners with
+          <span className="font-semibold"> Auditory Processing Disorder (APD)</span>
+          understand lectures through clearer, slower, and structured explanations —
+          reducing overload and improving focus.
         </p>
 
-        {/* Feature cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-10">
-          <div className="p-6 rounded-2xl border bg-indigo-50">
-            <h3 className="font-semibold text-lg mb-2">🧠 Personalized Learning</h3>
-            <p className="text-gray-600 text-sm">
-              Explanations adapt based on how you understand best.
+        {/* Features */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-8">
+          <div className="p-4 sm:p-6 rounded-2xl border bg-indigo-50">
+            <h3 className="font-semibold text-sm sm:text-base mb-1">
+              🧠 Personalized Learning
+            </h3>
+            <p className="text-xs sm:text-sm text-gray-600">
+              Explanations adapt to how you understand best.
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl border bg-purple-50">
-            <h3 className="font-semibold text-lg mb-2">⚡ Reduced Cognitive Load</h3>
-            <p className="text-gray-600 text-sm">
-              No overload. Clear steps, simple language, better flow.
+          <div className="p-4 sm:p-6 rounded-2xl border bg-purple-50">
+            <h3 className="font-semibold text-sm sm:text-base mb-1">
+              ⚡ Reduced Cognitive Load
+            </h3>
+            <p className="text-xs sm:text-sm text-gray-600">
+              Clear steps, simple language, better flow.
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl border bg-pink-50">
-            <h3 className="font-semibold text-lg mb-2">🎨 Accessible UI</h3>
-            <p className="text-gray-600 text-sm">
-              Fonts, colors, and layouts chosen for comfort and clarity.
+          <div className="p-4 sm:p-6 rounded-2xl border bg-pink-50">
+            <h3 className="font-semibold text-sm sm:text-base mb-1">
+              🎨 Accessible UI
+            </h3>
+            <p className="text-xs sm:text-sm text-gray-600">
+              Calm colors and layouts designed for comfort.
             </p>
           </div>
         </div>
@@ -48,13 +55,17 @@ const HomePage = () => {
         {/* CTA */}
         <button
           onClick={() => navigate("/onboarding")}
-          className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-semibold px-10 py-4 rounded-2xl shadow-lg transition transform hover:scale-105"
+          className="w-full sm:w-auto inline-flex items-center justify-center
+                     bg-indigo-600 hover:bg-indigo-700 text-white
+                     text-sm sm:text-base md:text-lg font-semibold
+                     px-6 sm:px-10 py-3 sm:py-4 rounded-2xl shadow-lg
+                     transition active:scale-95"
         >
           Get Started →
         </button>
 
-        {/* Footer note */}
-        <p className="mt-6 text-sm text-gray-500">
+        {/* Footer */}
+        <p className="mt-4 text-xs sm:text-sm text-gray-500">
           Takes less than 30 seconds • No signup required
         </p>
       </div>
