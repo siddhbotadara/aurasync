@@ -102,7 +102,25 @@ npm run first
 
 *This command installs all required frontend libraries (React, Tailwind, lucide-react, etc.).*
 
-### 3️⃣ Start the frontend development server
+### 3️⃣ Setup environment variables
+
+Create a `.env` file using the example:
+
+```bash
+cp .env.example .env
+```
+
+Fill in the required values in `.env`:
+
+```env
+---------------------Ask In Messages-------------------
+# Api endpoints
+VITE_API_BASE_URL = 
+```
+
+> 🔐 **Note:** `.env` files are not committed to GitHub. Ask the project maintainer for required secrets.
+
+### 4️⃣ Start the frontend development server
 
 ```bash
 npm run dev
