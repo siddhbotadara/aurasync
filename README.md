@@ -27,6 +27,14 @@ root
 
 ---
 
+## 🔁 Running the Project
+
+1. Start the **backend** first.
+2. Then start the **frontend**.
+3. Frontend communicates with backend at `http://localhost:3000`.
+
+---
+
 ## 🔧 Backend Setup
 
 ### 1️⃣ Navigate to the backend directory
@@ -130,11 +138,52 @@ npm run dev
 
 ---
 
-## 🔁 Running the Project
+## 🧩 Chrome Extension – Local Setup (Testing)
 
-1. Start the **backend** first.
-2. Then start the **frontend**.
-3. Frontend communicates with backend at `http://localhost:3000`.
+Follow these steps to install and test the AuraSync Chrome extension locally:
+
+### 1️⃣ Clone the latest repository
+
+```bash
+git clone <this repo url>
+```
+
+Make sure you are on the **latest version of `main`**.
+
+---
+
+### 2️⃣ Run the backend (required)
+
+The extension depends on the backend API.
+
+👉 Please follow the **backend setup instructions already provided in this repo** and run it locally before testing the extension.
+
+---
+
+### 3️⃣ Load the Chrome extension
+
+1. Open Chrome and go to: `chrome://extensions`
+2. Enable **Developer mode** (top-right)
+3. Click **Load unpacked**
+4. Select the **`extension/` folder** from this project
+5. The extension will appear — **pin it** from the Chrome toolbar
+
+---
+
+### 4️⃣ Test the extension
+
+* Open any supported page
+* Click the pinned AuraSync extension
+* Complete onboarding if prompted
+* Start using the app 🎉
+
+---
+
+### ℹ️ Notes
+
+* You **do not need to run the frontend separately** for extension testing
+* If you pull new changes later, reload the extension from `chrome://extensions`
+* Backend **must be running** for the extension to function correctly
 
 ---
 
