@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { requestAssist } from "../services/assist.api.js";
 
 import {
   Settings,
@@ -14,6 +15,11 @@ const Dashboard = () => {
   const [profileId, setProfileId] = useState(null);
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState(50);
+
+  const [transcriptChunk, setTranscriptChunk] = useState("");
+  const [assistResult, setAssistResult] = useState(null);
+  const [loadingAssist, setLoadingAssist] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,6 +31,33 @@ const Dashboard = () => {
     localStorage.removeItem("aurasync_profile_id");
     navigate("/", { replace: true });
   };
+
+  // Gemini function
+  const handleAssistClick = async () => {
+    if (!profileId || !transcriptChunk) return;
+
+    try {
+      setLoadingAssist(true);
+
+      const data = await requestAssist({
+        profileId,
+        text: transcriptChunk
+      });
+
+      setAssistResult(data);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to get explanation");
+    } finally {
+      setLoadingAssist(false);
+    }
+  };
+
+  useEffect(() => {
+    setTranscriptChunk(
+      "Okay so first we initialize the state, then we lift it up so child components can access it."
+    );
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 flex flex-col">
@@ -89,9 +122,29 @@ const Dashboard = () => {
               </h2>
 
               {/* Empty State */}
-              <div className="text-gray-500 text-sm">
-                Waiting for content to begin…
-              </div>
+              {assistResult ? (
+                <div className="space-y-4 text-sm">
+                  <div>
+                    <h4 className="font-medium mb-1">Simplified</h4>
+                    <p>{assistResult.simplified}</p>
+                  </div>
+
+                  {assistResult.keyPoints?.length > 0 && (
+                    <div>
+                      <h4 className="font-medium mb-1">Key Points</h4>
+                      <ul className="list-disc pl-4">
+                        {assistResult.keyPoints.map((p, i) => (
+                          <li key={i}>{p}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-gray-500 text-sm">
+                  Waiting for content to begin…
+                </div>
+              )}
             </div>
 
             {/* Profile ID (Dev / Transparency) */}
@@ -133,10 +186,13 @@ const Dashboard = () => {
             {/* Context Tools */}
             <div className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
               <h3 className="font-semibold">Context</h3>
-
-              <button className="w-full py-2 rounded-xl border hover:bg-gray-100">
-                Recap / How did we get here?
-              </button>
+            <button
+              onClick={handleAssistClick}
+              disabled={loadingAssist}
+              className="w-full py-2 rounded-xl border hover:bg-gray-100"
+            >
+              {loadingAssist ? "Thinking…" : "Recap / How did we get here?"}
+            </button>
             </div>
 
             {/* Preferences */}

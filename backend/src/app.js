@@ -3,9 +3,13 @@ dotenv.config();
 
 import Fastify from "fastify";
 import onboardingRoutes from "./routes/onboarding.routes.js";
+import assistRoutes from "./routes/assist.route.js";
 import cors from '@fastify/cors' 
 
-const app = Fastify({logger:true});
+const app = Fastify({
+  logger:true,
+  ignoreTrailingSlash:true
+});
 
 await app.register(cors, {
   origin: (origin, cb) => {
@@ -28,6 +32,7 @@ await app.register(cors, {
   credentials: true
 })
 
-app.register(onboardingRoutes, {prefix: process.env.ONBOARDING_API});
+app.register(onboardingRoutes, {prefix: process.env.ROUTE_API});
+app.register(assistRoutes, { prefix: process.env.ROUTE_API});
 
 export default app;
