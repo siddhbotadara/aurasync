@@ -12,6 +12,20 @@ import {
   RotateCcw
 } from "lucide-react";
 
+function arrayBufferToBase64(buffer) {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000; // 32KB chunks
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(
+      ...bytes.subarray(i, i + chunkSize)
+    );
+  }
+
+  return btoa(binary);
+}
+
 const Dashboard = () => {
   const [profileId, setProfileId] = useState(null);
   const [paused, setPaused] = useState(false);
@@ -20,6 +34,11 @@ const Dashboard = () => {
   const [transcriptChunk, setTranscriptChunk] = useState("");
   const [assistResult, setAssistResult] = useState(null);
   const [loadingAssist, setLoadingAssist] = useState(false);
+
+  const [recording, setRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  
+  const audioChunksRef = React.useRef([]);
 
   const navigate = useNavigate();
 
@@ -35,6 +54,89 @@ const Dashboard = () => {
   const resetProfile = () => {
     localStorage.removeItem("aurasync_profile_id");
     navigate("/", { replace: true });
+  };
+
+  // 🎤 Start mic recording
+  const startRecording = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    const recorder = new MediaRecorder(stream, {
+      mimeType: "audio/webm",
+    });
+
+    audioChunksRef.current = [];
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        audioChunksRef.current.push(e.data);
+      }
+    };
+
+    recorder.start();
+    setMediaRecorder(recorder);
+    setRecording(true);
+  };
+
+  // ⏹ Stop recording + send to backend
+  const stopRecording = () => {
+    if (!mediaRecorder) return;
+
+    setRecording(false);
+
+    mediaRecorder.onstop = async () => {
+      try {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+
+        // 🔍 SAFETY CHECK
+        if (blob.size === 0) {
+          alert("No audio captured. Please speak and try again.");
+          return;
+        }
+
+        const arrayBuffer = await blob.arrayBuffer();
+        const base64Audio = arrayBufferToBase64(arrayBuffer);
+
+
+        // TEMP / real profile
+        const onboarding =
+          JSON.parse(localStorage.getItem("aurasync_profile")) || {
+            comprehensionBreak: "Long explanations are hard",
+            learningPreference: "Step by step",
+            listeningThought: "I lose focus quickly",
+            struggleNote: "Technical lectures",
+          };
+
+        setLoadingAssist(true);
+
+        const res = await fetch("http://localhost:3000/api/audio/process", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            audio: base64Audio,
+            mimeType: "audio/webm",
+            userProfile: { onboarding },
+          }),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text);
+        }
+
+        const data = await res.json();
+
+        setTranscriptChunk(data.transcript);
+        setAssistResult(data.aiResult);
+      } catch (err) {
+        console.error(err);
+        alert("Audio processing failed");
+      } finally {
+        setLoadingAssist(false);
+      }
+    };
+
+    // ⬇️ STOP AFTER handler is set
+    mediaRecorder.stop();
   };
 
   // Gemini function
@@ -57,12 +159,6 @@ const Dashboard = () => {
       setLoadingAssist(false);
     }
   };
-
-  useEffect(() => {
-    setTranscriptChunk(
-      "Okay so first we initialize the state, then we lift it up so child components can access it."
-    );
-  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 flex flex-col">
@@ -217,6 +313,16 @@ const Dashboard = () => {
             {/* Context Tools */}
             <div className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
               <h3 className="font-semibold">Context</h3>
+              <button
+                onClick={recording ? stopRecording : startRecording}
+                className={`w-full py-2 rounded-xl border ${
+                  recording
+                    ? "bg-red-50 border-red-300 text-red-700"
+                    : "hover:bg-gray-100"
+                }`}
+              >
+                {recording ? "Stop Listening" : "Start Listening"}
+              </button>
             <button
               onClick={handleAssistClick}
               disabled={loadingAssist}

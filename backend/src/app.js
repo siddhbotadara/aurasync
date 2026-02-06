@@ -4,6 +4,7 @@ dotenv.config();
 import Fastify from "fastify";
 import onboardingRoutes from "./routes/onboarding.routes.js";
 import assistRoutes from "./routes/assist.route.js";
+import audioRoutes from "./routes/audio.routes.js";
 import cors from '@fastify/cors' 
 
 const app = Fastify({
@@ -32,6 +33,7 @@ await app.register(cors, {
   credentials: true
 })
 
+app.register(audioRoutes, { prefix: process.env.ROUTE_API});
 app.register(onboardingRoutes, {prefix: process.env.ROUTE_API});
 app.register(assistRoutes, { prefix: process.env.ROUTE_API});
 
