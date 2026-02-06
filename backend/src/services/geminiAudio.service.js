@@ -4,10 +4,10 @@ dotenv.config();
 import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY_2_5, // different key
+  apiKey: process.env.GEMINI_API_LIVE_AUDIO,
 });
 
-export async function transcribeAudio({ base64Audio, mimeType }) {
+export async function processNativeAudio({ base64Audio, mimeType }) {
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: [
@@ -17,14 +17,16 @@ export async function transcribeAudio({ base64Audio, mimeType }) {
           {
             inlineData: {
               data: base64Audio,
-              mimeType, // "audio/webm" | "audio/wav"
+              mimeType, // audio/webm
             },
           },
-          { text: "Transcribe this audio to plain text only." },
         ],
       },
     ],
+    config: {
+      responseModalities: ["TEXT"], // IMPORTANT
+    },
   });
 
-  return response.text.trim();
+  return response.text;
 }

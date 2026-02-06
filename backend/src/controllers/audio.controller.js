@@ -1,34 +1,27 @@
-import { transcribeAudio } from "../services/transcribe.service.js";
+import { processNativeAudio } from "../services/geminiAudio.service.js";
 import { processWithGemini } from "../services/gemini.service.js";
 
 export async function handleAudio(req, reply) {
   const { audio, mimeType, userProfile } = req.body;
 
-  console.log("BODY RECEIVED:", {
-    hasAudio: !!req.body.audio,
-    hasUserProfile: !!req.body.userProfile,
-    hasOnboarding: !!req.body.userProfile?.onboarding
-  });
-
-
-  if (!audio || !userProfile) {
+  if (!audio || !userProfile?.onboarding) {
     return reply.code(400).send({ error: "Missing audio or user profile" });
   }
 
-  // 1️⃣ Audio → Text (Gemini 2.5 Flash)
-  const transcript = await transcribeAudio({
+  // 1️⃣ Native audio understanding (Gemini 2.5 Flash)
+  const spokenText = await processNativeAudio({
     base64Audio: audio,
     mimeType,
   });
 
-  // 2️⃣ Text → Your existing Gemini 3 logic
+  // 2️⃣ APD structured response (Gemini 3)
   const aiResult = await processWithGemini({
-    text: transcript,
+    text: spokenText,
     userProfile,
   });
 
   return {
-    transcript,
+    transcript: spokenText,
     aiResult,
   };
 }
