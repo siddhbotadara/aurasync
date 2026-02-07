@@ -1,30 +1,40 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function useTypewriter(text, speed = 50, isPaused = false) {
   const [displayedText, setDisplayedText] = useState("");
+  const intervalRef = useRef(null);
 
   useEffect(() => {
-    if (!text) {
-      setDisplayedText("");
-      return;
+    if (!text || isPaused) return;
+
+    // Clear previous interval safely
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
     }
 
-    if (isPaused) return;
-
-    setDisplayedText(""); // Clear text when new result arrives
-    let i = 0;
+    setDisplayedText("");
     const words = text.split(" ");
-    
-    const interval = setInterval(() => {
-      if (i < words.length) {
-        setDisplayedText((prev) => prev + (prev ? " " : "") + words[i]);
+    let i = 0;
+
+    intervalRef.current = setInterval(() => {
+      setDisplayedText((prev) => {
+        if (i >= words.length) {
+          clearInterval(intervalRef.current);
+          return prev;
+        }
+
+        const nextWord = words[i];
         i++;
-      } else {
-        clearInterval(interval);
-      }
+
+        return prev
+          ? `${prev} ${nextWord}`
+          : nextWord;
+      });
     }, speed);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(intervalRef.current);
+    };
   }, [text, speed, isPaused]);
 
   return displayedText;

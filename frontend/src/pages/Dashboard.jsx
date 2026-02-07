@@ -44,7 +44,12 @@ const Dashboard = () => {
 
   const animationDelay = 200 - (speed * 1.8);
 
-  const animatedSimplified = useTypewriter(assistResult?.simplified, animationDelay, paused);
+  const animatedSimplified = useTypewriter(
+    assistResult?.simplified || "",
+    animationDelay,
+    paused
+  );
+
 
   useEffect(() => {
     const id = localStorage.getItem("aurasync_profile_id");
@@ -248,6 +253,22 @@ const Dashboard = () => {
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+                  
+                  {/* Steps (only if multi-step detected) */}
+                  {assistResult.flags?.multi_step && assistResult.steps?.length > 0 && (
+                    <div className="pt-2 border-t border-gray-50 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                      <h4 className="font-medium mb-2 text-indigo-600 uppercase tracking-wider text-[10px]">
+                        Steps
+                      </h4>
+                      <ol className="list-decimal pl-5 space-y-2">
+                        {assistResult.steps.map((step, i) => (
+                          <li key={i} className="bg-green-50/60 p-2 rounded-lg">
+                            {step}
+                          </li>
+                        ))}
+                      </ol>
                     </div>
                   )}
                 </div>
