@@ -9,7 +9,8 @@ import cors from '@fastify/cors'
 
 const app = Fastify({
   logger:true,
-  ignoreTrailingSlash:true
+  ignoreTrailingSlash:true,
+  bodyLimit: 20 * 1024 * 1024
 });
 
 await app.register(cors, {

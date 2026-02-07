@@ -42,14 +42,79 @@ const Dashboard = () => {
 
   const navigate = useNavigate();
 
-  const animationDelay = 200 - (speed * 1.8);
+  const animationDelay = Math.max(20, 200 - speed * 1.8);
 
-  const animatedSimplified = useTypewriter(
-    assistResult?.simplified || "",
+  const {
+    text: animatedSimplified,
+    done: simplifiedDone
+  } = useTypewriter(
+    assistResult?._rawSimplified || "",
     animationDelay,
     paused
   );
 
+  const normalizeHardWords = (hardWords = {}) => {
+    const entries = Object.entries(hardWords);
+
+    // Sort longest phrases first (IMPORTANT)
+    entries.sort((a, b) => b[0].length - a[0].length);
+
+    return entries.map(([word, description]) => ({
+      word,
+      description,
+      used: false
+    }));
+  };
+
+  const animationDone = 
+    animatedSimplified === assistResult?._rawSimplified;
+
+  const renderTextWithHighlights = (text) => {
+    if (!text || !assistResult?.hardWords) return text;
+
+    const hardWordList = normalizeHardWords(assistResult.hardWords);
+
+    let remainingText = text;
+    const output = [];
+
+    while (remainingText.length > 0) {
+      let matched = false;
+
+      for (const hw of hardWordList) {
+        if (hw.used) continue;
+
+        const regex = new RegExp(`\\b${hw.word}\\b`, "i");
+        const match = remainingText.match(regex);
+
+        if (match && match.index === 0) {
+          hw.used = true;
+          matched = true;
+
+          output.push(
+            <span
+              key={output.length}
+              className="relative group text-indigo-600 font-semibold underline decoration-dotted cursor-help"
+            >
+              {match[0]}
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-[10px] px-2 py-1 rounded shadow-xl z-50 w-48 text-center leading-tight">
+                {hw.description}
+              </span>
+            </span>
+          );
+
+          remainingText = remainingText.slice(match[0].length);
+          break;
+        }
+      }
+
+      if (!matched) {
+        output.push(remainingText[0]);
+        remainingText = remainingText.slice(1);
+      }
+    }
+
+    return output;
+  };
 
   useEffect(() => {
     const id = localStorage.getItem("aurasync_profile_id");
@@ -131,7 +196,10 @@ const Dashboard = () => {
         const data = await res.json();
 
         setTranscriptChunk(data.transcript);
-        setAssistResult(data.aiResult);
+        setAssistResult({
+          ...data.aiResult,
+          _rawSimplified: data.aiResult.simplified // 🔒 keep original safe
+        });
       } catch (err) {
         console.error(err);
         alert("Audio processing failed");
@@ -147,16 +215,17 @@ const Dashboard = () => {
   // Gemini function
   const handleAssistClick = async () => {
     if (!profileId || !transcriptChunk) return;
-
     try {
       setLoadingAssist(true);
-
       const data = await requestAssist({
         profileId,
         text: transcriptChunk
       });
 
-      setAssistResult(data);
+      setAssistResult({
+        ...data,
+        _rawSimplified: data.simplified // MUST set this for the typewriter!
+      });
     } catch (err) {
       console.error(err);
       alert("Failed to get explanation");
@@ -235,7 +304,9 @@ const Dashboard = () => {
                     </h4>
                     {/* Animated text from our hook */}
                     <p className="leading-relaxed text-gray-700 text-base">
-                      {animatedSimplified}
+                      {simplifiedDone
+                        ? renderTextWithHighlights(assistResult._rawSimplified)
+                        : animatedSimplified}
                     </p>
                   </div>
 
@@ -249,7 +320,7 @@ const Dashboard = () => {
                         {assistResult.keyPoints.map((p, i) => (
                           <li key={i} className="flex items-start gap-2 bg-indigo-50/50 p-2 rounded-lg">
                             <span className="text-indigo-400 mt-1">•</span>
-                            <span>{p}</span>
+                            <span>{renderTextWithHighlights(p)}</span>
                           </li>
                         ))}
                       </ul>
@@ -265,7 +336,7 @@ const Dashboard = () => {
                       <ol className="list-decimal pl-5 space-y-2">
                         {assistResult.steps.map((step, i) => (
                           <li key={i} className="bg-green-50/60 p-2 rounded-lg">
-                            {step}
+                            {renderTextWithHighlights(step)}
                           </li>
                         ))}
                       </ol>
