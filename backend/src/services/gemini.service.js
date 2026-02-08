@@ -4,7 +4,7 @@ dotenv.config();
 import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_SIDDH_API_3
+  apiKey: process.env.GEMINI_SIDDH_API_4
 });
 
 export async function processWithGemini({ text, userProfile }) {
@@ -39,6 +39,18 @@ If unsure, REPHRASE instead of shortening.
 
 BAD: "Plants water air make oxygen"
 GOOD: "Plants use sunlight to turn water and air into food and oxygen."
+
+────────────────────────────────
+CRITICAL RULE — SIMPLIFIED SENTENCE
+────────────────────────────────
+The "simplified" field MUST be a single, punchy summary of the entire transcript.
+- MAX 30 words.
+- ONE paragraph only.
+- Explain the "gist" of the conversation so a user knows exactly what happened in seconds.
+
+ABSOLUTELY FORBIDDEN:
+- Providing a full transcript in the "simplified" field.
+- Going over two sentences.
 
 ────────────────────────────────
 KEY POINTS
@@ -81,6 +93,28 @@ FLAGS
 - needs_visual → diagrams help
 - multi_step → ONLY if steps exist
 
+────────────────────
+VOCAL TONE DETECTION
+────────────────────
+Analyze the speaker's tone based on wording and context.
+
+Detect ONE of the following per speaker segment:
+- serious
+- neutral
+- joking
+- sarcastic
+- angry
+- confused
+- stressed
+
+Rules:
+- Do NOT guess wildly
+- If unsure, use "neutral"
+- Tone must match spoken intent, not topic
+- Sarcasm ONLY if clearly implied by wording
+
+Return tone per speaker segment.
+
 ────────────────────────────────
 USER PROFILE (DO NOT IGNORE)
 ────────────────────────────────
@@ -88,6 +122,47 @@ Comprehension issue: ${onboarding?.comprehensionBreak || "unknown"}
 Learning preference: ${onboarding?.learningPreference || "unknown"}
 Listening issue: ${onboarding?.listeningThought || "unknown"}
 User struggle note: "${onboarding?.struggleNote || "None"}"
+
+────────────────────
+SPEAKER & NOISE DETECTION (APD CRITICAL)
+────────────────────
+
+Analyze the transcript for speaker context.
+
+If multiple speakers are clearly implied:
+- Label speakers using roles, NOT names
+- Examples: "Teacher", "Student", "Interviewer", "Speaker 1", "Speaker 2"
+
+If and only if the conversation appears to be fictional or cinematic. For example, in movie then,
+infer speaker roles consistently and label them.
+If unsure, use Speaker A / Speaker B.
+
+Rules:
+- ONLY add speaker labels if context strongly suggests them
+- Do NOT guess randomly
+- Do NOT invent dialogue
+- Do NOT split unless meaning improves clarity for APD users
+
+If background noise, interruptions, or irrelevant chatter exists:
+- Set noiseDetected = true
+- Ignore noise in simplified output
+
+Noise examples:
+- Side conversations
+- Laughter
+- Mic disturbances
+- Filler speech without meaning
+
+────────────────────
+JSON ADDITION
+────────────────────
+
+Add these optional fields:
+
+"speakerSegments": [
+  { "speaker": "", "text": "" }
+],
+"noiseDetected": false
 
 ────────────────────────────────
 RETURN ONLY VALID JSON
@@ -97,6 +172,14 @@ RETURN ONLY VALID JSON
   "keyPoints": [],
   "steps": [],
   "hardWords": {},
+  "speakerSegments": [
+    {
+      "speaker": "Narrator",
+      "text": "",
+      "tone": "neutral"
+    }
+  ],
+  "noiseDetected": false,
   "flags": {
     "complex_concept": false,
     "needs_visual": false,
@@ -143,6 +226,29 @@ REWRITE IT before returning JSON.
 
   const result = JSON.parse(match[0]);
 
+  const ALLOWED_TONES = [
+    "serious",
+    "neutral",
+    "joking",
+    "sarcastic",
+    "angry",
+    "confused",
+    "stressed"
+  ];
+
+  // 🧠 SPEAKER SANITY CHECK (CRITICAL)
+  if (Array.isArray(result.speakerSegments)) {
+    const uniqueSpeakers = new Set(
+      result.speakerSegments.map(s => s.speaker)
+    );
+
+    // ❌ If only one speaker OR no clear turn-taking → disable speaker mode
+    if (uniqueSpeakers.size < 2) {
+      result.speakerSegments = [];
+    }
+  }
+
+
   // ─────────────────────────────
   // 🧼 STRONG POST-VALIDATION
   // ─────────────────────────────
@@ -153,6 +259,30 @@ REWRITE IT before returning JSON.
   if (typeof result.hardWords !== "object" || Array.isArray(result.hardWords)) {
     result.hardWords = {};
   }
+
+  // Normalize speakerSegments
+  if (!Array.isArray(result.speakerSegments)) {
+    result.speakerSegments = [];
+  }
+
+  result.speakerSegments = result.speakerSegments.filter(
+    seg =>
+      seg &&
+      typeof seg.speaker === "string" &&
+      typeof seg.text === "string" &&
+      seg.text.trim().length > 0
+  );
+
+  // 🎭 Normalize tone per speaker (APD-safe)
+  result.speakerSegments = result.speakerSegments.map(seg => ({
+    speaker: seg.speaker || "Narrator",
+    text: seg.text,
+    tone: ALLOWED_TONES.includes(seg.tone) ? seg.tone : "neutral"
+  }));
+
+
+  // Normalize noiseDetected
+  result.noiseDetected = Boolean(result.noiseDetected);
 
   // Enforce steps rule
   if (!result.flags?.multi_step) {

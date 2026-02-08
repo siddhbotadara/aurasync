@@ -12,6 +12,25 @@ import {
   RotateCcw
 } from "lucide-react";
 
+const getToneColor = (tone) => {
+  switch (tone) {
+    case "sarcastic":
+      return "bg-purple-100 text-purple-700";
+    case "joking":
+      return "bg-green-100 text-green-700";
+    case "angry":
+      return "bg-red-100 text-red-700";
+    case "confused":
+      return "bg-yellow-100 text-yellow-700";
+    case "stressed":
+      return "bg-orange-100 text-orange-700";
+    case "serious":
+      return "bg-blue-100 text-blue-700";
+    default:
+      return "bg-gray-100 text-gray-600";
+  }
+};
+
 function arrayBufferToBase64(buffer) {
   let binary = "";
   const bytes = new Uint8Array(buffer);
@@ -44,6 +63,13 @@ const Dashboard = () => {
 
   const animationDelay = Math.max(20, 200 - speed * 1.8);
 
+  const usedHardWordsRef = React.useRef(new Set());
+
+  const hasSpeakers =
+    Array.isArray(assistResult?.speakerSegments) &&
+    assistResult.speakerSegments.length >= 2;
+
+
   const {
     text: animatedSimplified,
     done: simplifiedDone
@@ -69,51 +95,52 @@ const Dashboard = () => {
   const animationDone = 
     animatedSimplified === assistResult?._rawSimplified;
 
-  const renderTextWithHighlights = (text) => {
+  const renderTextWithHighlights = (text, allowHighlighting = true) => {
     if (!text || !assistResult?.hardWords) return text;
 
-    const hardWordList = normalizeHardWords(assistResult.hardWords);
+    const hardWordsMap = assistResult.hardWords;
+    const wordsToMatch = Object.keys(hardWordsMap);
 
-    let remainingText = text;
-    const output = [];
+    if (wordsToMatch.length === 0) return text;
 
-    while (remainingText.length > 0) {
-      let matched = false;
+    // 1. Sort by length (longest first) to prevent "AI" matching inside "Explainable AI"
+    const sortedWords = [...wordsToMatch].sort((a, b) => b.length - a.length);
+    
+    // 2. Build regex
+    const escapedWords = sortedWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const regex = new RegExp(`(\\b${escapedWords.join("\\b|\\b")}\\b)`, "gi");
 
-      for (const hw of hardWordList) {
-        if (hw.used) continue;
+    const parts = text.split(regex);
 
-        const regex = new RegExp(`\\b${hw.word}\\b`, "i");
-        const match = remainingText.match(regex);
+    return parts.map((part, i) => {
+      const lowerPart = part.toLowerCase();
+      
+      // Find the original key from hardWordsMap that matches this part
+      const originalKey = wordsToMatch.find(w => w.toLowerCase() === lowerPart);
 
-        if (match && match.index === 0) {
-          hw.used = true;
-          matched = true;
-
-          output.push(
-            <span
-              key={output.length}
-              className="relative group text-indigo-600 font-semibold underline decoration-dotted cursor-help"
-            >
-              {match[0]}
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-[10px] px-2 py-1 rounded shadow-xl z-50 w-48 text-center leading-tight">
-                {hw.description}
-              </span>
+      // LOGIC: If it's a hard word AND we haven't highlighted it yet in this string...
+      if (
+        allowHighlighting &&
+        originalKey &&
+        !usedHardWordsRef.current.has(lowerPart)
+      ) {
+        
+        return (
+          <span
+            key={i}
+            className="relative group text-indigo-600 font-semibold underline decoration-dotted cursor-help"
+          >
+            {part}
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-[10px] px-2 py-1 rounded shadow-xl z-50 w-48 text-center leading-tight normal-case font-normal">
+              {hardWordsMap[originalKey]}
             </span>
-          );
-
-          remainingText = remainingText.slice(match[0].length);
-          break;
-        }
+          </span>
+        );
       }
 
-      if (!matched) {
-        output.push(remainingText[0]);
-        remainingText = remainingText.slice(1);
-      }
-    }
-
-    return output;
+      // Otherwise, just return the plain text (covers non-matches AND repeat matches)
+      return part;
+    });
   };
 
   useEffect(() => {
@@ -125,6 +152,13 @@ const Dashboard = () => {
     localStorage.removeItem("aurasync_profile_id");
     navigate("/", { replace: true });
   };
+
+  useEffect(() => {
+    if (assistResult) {
+      usedHardWordsRef.current.clear();
+    }
+  }, [assistResult]);
+
 
   // 🎤 Start mic recording
   const startRecording = async () => {
@@ -200,6 +234,7 @@ const Dashboard = () => {
           ...data.aiResult,
           _rawSimplified: data.aiResult.simplified // 🔒 keep original safe
         });
+        usedHardWordsRef.current.clear();
       } catch (err) {
         console.error(err);
         alert("Audio processing failed");
@@ -226,6 +261,7 @@ const Dashboard = () => {
         ...data,
         _rawSimplified: data.simplified // MUST set this for the typewriter!
       });
+      usedHardWordsRef.current.clear();
     } catch (err) {
       console.error(err);
       alert("Failed to get explanation");
@@ -291,6 +327,11 @@ const Dashboard = () => {
 
           {/* ───── Left: Understanding Panel ───── */}
           <section className="lg:col-span-2 space-y-4">
+            {assistResult?.noiseDetected && (
+              <div className="mb-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                ⚠️ Background noise was detected. Some sounds were ignored for clarity.
+              </div>
+            )}
             <div className="bg-white rounded-2xl shadow-sm p-6">
               <h2 className="text-lg font-semibold mb-4">
                 Live Understanding
@@ -303,11 +344,37 @@ const Dashboard = () => {
                       Simplified
                     </h4>
                     {/* Animated text from our hook */}
-                    <p className="leading-relaxed text-gray-700 text-base">
-                      {simplifiedDone
-                        ? renderTextWithHighlights(assistResult._rawSimplified)
-                        : animatedSimplified}
-                    </p>
+                    <div className="leading-relaxed text-gray-700 text-base space-y-2">
+                      {hasSpeakers ? (
+                      assistResult.speakerSegments.map((seg, i) => (
+                        <div key={i} className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-indigo-600">
+                              {seg.speaker}
+                            </span>
+
+                            {seg.tone && seg.tone !== "neutral" && (
+                              <span
+                                className={`text-[10px] px-2 py-[2px] rounded-full font-medium ${getToneColor(seg.tone)}`}
+                              >
+                                {seg.tone.toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+
+                          <span className="pl-4">
+                            {renderTextWithHighlights(seg.text, simplifiedDone)}
+                          </span>
+                        </div>
+                      ))
+                      ) : (
+                        <p>
+                          {simplifiedDone
+                            ? renderTextWithHighlights(assistResult._rawSimplified,true)
+                            : animatedSimplified}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Key Points with a CSS fade-in animation */}
@@ -320,7 +387,7 @@ const Dashboard = () => {
                         {assistResult.keyPoints.map((p, i) => (
                           <li key={i} className="flex items-start gap-2 bg-indigo-50/50 p-2 rounded-lg">
                             <span className="text-indigo-400 mt-1">•</span>
-                            <span>{renderTextWithHighlights(p)}</span>
+                            <span>{renderTextWithHighlights(p, simplifiedDone)}</span>
                           </li>
                         ))}
                       </ul>
@@ -336,7 +403,7 @@ const Dashboard = () => {
                       <ol className="list-decimal pl-5 space-y-2">
                         {assistResult.steps.map((step, i) => (
                           <li key={i} className="bg-green-50/60 p-2 rounded-lg">
-                            {renderTextWithHighlights(step)}
+                            {renderTextWithHighlights(step, simplifiedDone)}
                           </li>
                         ))}
                       </ol>
