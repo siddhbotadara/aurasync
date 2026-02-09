@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_SIDDH_API_5
+  apiKey: process.env.GEMINI_SIDDH_API_7
 });
 
 export async function generateMermaidDiagram({ simplified, keyPoints, type = "FLOWCHART" }) {
@@ -23,7 +23,7 @@ Key Points: ${keyPoints.join("\n")}
 `;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-3-flash-preview",
     contents: [{ role: "user", parts: [{ text: prompt }] }],
   });
 

@@ -35,7 +35,7 @@ const getToneColor = (tone) => {
 function arrayBufferToBase64(buffer) {
   let binary = "";
   const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000; // 32KB chunks
+  const chunkSize = 0x8000;
 
   for (let i = 0; i < bytes.length; i += chunkSize) {
     binary += String.fromCharCode(
@@ -93,7 +93,6 @@ const Dashboard = () => {
   const normalizeHardWords = (hardWords = {}) => {
     const entries = Object.entries(hardWords);
 
-    // Sort longest phrases first (IMPORTANT)
     entries.sort((a, b) => b[0].length - a[0].length);
 
     return entries.map(([word, description]) => ({
@@ -114,10 +113,8 @@ const Dashboard = () => {
 
     if (wordsToMatch.length === 0) return text;
 
-    // 1. Sort by length (longest first) to prevent "AI" matching inside "Explainable AI"
     const sortedWords = [...wordsToMatch].sort((a, b) => b.length - a.length);
     
-    // 2. Build regex
     const escapedWords = sortedWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
     const regex = new RegExp(`(\\b${escapedWords.join("\\b|\\b")}\\b)`, "gi");
 
@@ -126,10 +123,8 @@ const Dashboard = () => {
     return parts.map((part, i) => {
       const lowerPart = part.toLowerCase();
       
-      // Find the original key from hardWordsMap that matches this part
       const originalKey = wordsToMatch.find(w => w.toLowerCase() === lowerPart);
 
-      // LOGIC: If it's a hard word AND we haven't highlighted it yet in this string...
       if (
         allowHighlighting &&
         originalKey &&
@@ -139,17 +134,16 @@ const Dashboard = () => {
         return (
           <span
             key={i}
-            className="relative group text-indigo-600 font-semibold underline decoration-dotted cursor-help"
+            className="relative group text-indigo-700 font-semibold underline decoration-dotted decoration-indigo-400/50 cursor-help transition-colors hover:text-indigo-800"
           >
             {part}
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-[10px] px-2 py-1 rounded shadow-xl z-50 w-48 text-center leading-tight normal-case font-normal">
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs px-3 py-2 rounded-xl shadow-2xl z-50 w-56 text-center leading-snug normal-case font-normal backdrop-blur-sm">
               {hardWordsMap[originalKey]}
             </span>
           </span>
         );
       }
 
-      // Otherwise, just return the plain text (covers non-matches AND repeat matches)
       return part;
     });
   };
@@ -166,7 +160,7 @@ const Dashboard = () => {
         body: JSON.stringify({
           profileId,
           query: contextQuery,
-          previousResult: assistResult, // ✅ FULL OBJECT
+          previousResult: assistResult,
         }),
       });
 
@@ -232,7 +226,6 @@ const Dashboard = () => {
 
         const data = await res.json();
 
-        // 🧠 RESPECT AGENT DECISION
         if (!cancelled && data.visualIntent !== "NONE" && data.diagram) {
           setMermaidDiagram(data.diagram);
         }
@@ -248,7 +241,6 @@ const Dashboard = () => {
     };
   }, [assistResult]);
 
-  // 🎤 Start mic recording
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -269,7 +261,6 @@ const Dashboard = () => {
     setRecording(true);
   };
 
-  // ⏹ Stop recording + send to backend
   const stopRecording = () => {
     if (!mediaRecorder) return;
 
@@ -279,7 +270,6 @@ const Dashboard = () => {
       try {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
 
-        // 🔍 SAFETY CHECK
         if (blob.size === 0) {
           alert("No audio captured. Please speak and try again.");
           return;
@@ -289,7 +279,6 @@ const Dashboard = () => {
         const base64Audio = arrayBufferToBase64(arrayBuffer);
 
 
-        // TEMP / real profile
         const onboarding =
           JSON.parse(localStorage.getItem("aurasync_profile")) || {
             comprehensionBreak: "Long explanations are hard",
@@ -320,7 +309,7 @@ const Dashboard = () => {
         setTranscriptChunk(data.transcript);
         setAssistResult({
           ...data.aiResult,
-          _rawSimplified: data.aiResult.simplified // 🔒 keep original safe
+          _rawSimplified: data.aiResult.simplified
         });
         usedHardWordsRef.current.clear();
       } catch (err) {
@@ -331,11 +320,9 @@ const Dashboard = () => {
       }
     };
 
-    // ⬇️ STOP AFTER handler is set
     mediaRecorder.stop();
   };
 
-  // Gemini function
   const handleAssistClick = async () => {
     if (!profileId || !transcriptChunk) return;
     try {
@@ -347,7 +334,7 @@ const Dashboard = () => {
 
       setAssistResult({
         ...data,
-        _rawSimplified: data.simplified // MUST set this for the typewriter!
+        _rawSimplified: data.simplified
       });
       usedHardWordsRef.current.clear();
     } catch (err) {
@@ -359,139 +346,129 @@ const Dashboard = () => {
   };
   
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-violet-50/20">
 
-      {/* ───────────────── Top Navigation ───────────────── */}
-      <header className="sticky top-0 z-40 h-16 bg-white border-b flex items-center justify-between px-6">
-        <h1 className="text-xl font-semibold tracking-tight">
-          AuraSync
-        </h1>
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/80 border-b border-indigo-100/50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent tracking-tight">
+            AuraSync
+          </h1>
 
-        <div className="flex items-center gap-4">
-          <button className="p-2 rounded-lg hover:bg-gray-100 focus-visible:ring">
-            <HelpCircle size={20} />
-          </button>
-          <button className="p-2 rounded-lg hover:bg-gray-100 focus-visible:ring">
-            <Settings size={20} />
-          </button>
-          <button className="p-2 rounded-lg hover:bg-gray-100 focus-visible:ring">
-            <User size={20} />
-          </button>
-            <button
-            onClick={resetProfile}
-            className="
-                w-full group relative overflow-hidden
-                rounded-2xl px-4 py-3
-                bg-gradient-to-br from-red-500/90 to-rose-600/90
-                text-white font-medium tracking-wide
-                shadow-lg shadow-red-500/20
-                hover:shadow-red-500/40
-                hover:scale-[1.01]
-                active:scale-[0.98]
-                transition-all duration-200 ease-out
-
-                focus:outline-none focus-visible:ring-2
-                focus-visible:ring-red-400 focus-visible:ring-offset-2
-            "
-            >
-            <span className="relative z-10">New Session</span>
-
-            {/* subtle glow layer */}
-            <span
-                className="
-                pointer-events-none absolute inset-0
-                bg-gradient-to-r from-white/10 to-transparent
-                opacity-0 group-hover:opacity-100
-                transition-opacity
-                "
-            />
+          <div className="flex items-center gap-2">
+            <button className="p-2 rounded-xl hover:bg-indigo-50 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 text-slate-600 hover:text-indigo-600">
+              <HelpCircle size={20} strokeWidth={2} />
             </button>
+            <button className="p-2 rounded-xl hover:bg-indigo-50 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 text-slate-600 hover:text-indigo-600">
+              <Settings size={20} strokeWidth={2} />
+            </button>
+            <button className="p-2 rounded-xl hover:bg-indigo-50 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 text-slate-600 hover:text-indigo-600">
+              <User size={20} strokeWidth={2} />
+            </button>
+            <button
+              onClick={resetProfile}
+              className="ml-2 px-4 py-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white text-sm font-medium shadow-md shadow-rose-500/25 hover:shadow-lg hover:shadow-rose-500/35 hover:scale-105 active:scale-95 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2"
+            >
+              New Session
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* ───────────────── Main Content ───────────────── */}
-      <main className="flex-1 px-6 py-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-          {/* ───── Left: Understanding Panel ───── */}
-          <section className="lg:col-span-2 space-y-4">
+          <section className="lg:col-span-8 space-y-4">
             {assistResult?.noiseDetected && (
-              <div className="mb-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-                ⚠️ Background noise was detected. Some sounds were ignored for clarity.
+              <div className="rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 px-4 py-2.5 text-sm text-amber-800 shadow-sm flex items-start gap-2">
+                <span className="text-base">⚠️</span>
+                <span>Background noise was detected. Some sounds were ignored for clarity.</span>
               </div>
             )}
-            <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold mb-4">
-                Live Understanding
-              </h2>
+            
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg shadow-indigo-100/50 border border-indigo-100/30 p-5 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-slate-800">
+                  Live Understanding
+                </h2>
+                {assistResult && (
+                  <div className="h-2 w-2 rounded-full bg-gradient-to-r from-emerald-400 to-green-500 animate-pulse shadow-lg shadow-emerald-500/50"></div>
+                )}
+              </div>
 
               {assistResult ? (
-                <div className="space-y-4 text-sm">
-                  <div>
-                    <h4 className="font-medium mb-1 text-indigo-600 uppercase tracking-wider text-[10px]">
+                <div className="space-y-5">
+                  <div className="bg-gradient-to-br from-indigo-50/50 to-violet-50/30 rounded-xl p-3 border border-indigo-100/50">
+                    <h4 className="font-bold text-[11px] uppercase tracking-widest text-indigo-700 mb-3 flex items-center gap-2">
+                      <div className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full"></div>
                       Simplified
                     </h4>
-                    {/* Animated text from our hook */}
-                    <div className="leading-relaxed text-gray-700 text-base space-y-2">
+                    <div className="leading-relaxed text-slate-700 text-base space-y-3">
                       {hasSpeakers ? (
                       assistResult.speakerSegments.map((seg, i) => (
-                        <div key={i} className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-indigo-600">
+                        <div key={i} className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-indigo-700 text-sm">
                               {seg.speaker}
                             </span>
 
                             {seg.tone && seg.tone !== "neutral" && (
                               <span
-                                className={`text-[10px] px-2 py-[2px] rounded-full font-medium ${getToneColor(seg.tone)}`}
+                                className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${getToneColor(seg.tone)}`}
                               >
-                                {seg.tone.toUpperCase()}
+                                {seg.tone}
                               </span>
                             )}
                           </div>
-
-                          <span className="pl-4">
+                          <p className="border-l-2 border-indigo-200 pl-2 -ml-2">
                             {renderTextWithHighlights(seg.text, simplifiedDone)}
-                          </span>
+                          </p>
                         </div>
                       ))
                       ) : (
-                        <p>
-                          {simplifiedDone
-                            ? renderTextWithHighlights(assistResult._rawSimplified,true)
-                            : animatedSimplified}
+                        <p className="text-slate-700">
+                        <span key={`${speed}-${assistResult?._rawSimplified}`}>
+                          {renderTextWithHighlights(
+                            (paused && !simplifiedDone) || simplifiedDone
+                              ? assistResult._rawSimplified
+                              : animatedSimplified,
+                            true
+                          )}
+                        </span>
                         </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Key Points with a CSS fade-in animation */}
                   {assistResult.keyPoints?.length > 0 && (
-                    <div className="pt-2 border-t border-gray-50 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                      <h4 className="font-medium mb-2 text-indigo-600 uppercase tracking-wider text-[10px]">
+                    <div className="animate-in fade-in slide-in-from-bottom-3 duration-500">
+                      <h4 className="font-bold text-[11px] uppercase tracking-widest text-indigo-700 mb-3 flex items-center gap-2">
+                        <div className="h-1 w-8 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full"></div>
                         Key Points
                       </h4>
-                      <ul className="grid grid-cols-1 gap-2">
+                      <div className="grid gap-2">
                         {assistResult.keyPoints.map((p, i) => (
-                          <li key={i} className="flex items-start gap-2 bg-indigo-50/50 p-2 rounded-lg">
-                            <span className="text-indigo-400 mt-1">•</span>
-                            <span>{renderTextWithHighlights(p, simplifiedDone)}</span>
-                          </li>
+                          <div key={i} className="flex items-start gap-3 bg-gradient-to-r from-indigo-50/80 to-violet-50/60 p-3 rounded-xl border border-indigo-100/40 hover:border-indigo-200/60 transition-colors">
+                            <span className="text-indigo-500 font-bold text-lg leading-none mt-0.5">•</span>
+                            <span className="text-slate-700 text-sm leading-relaxed flex-1">{renderTextWithHighlights(p, simplifiedDone)}</span>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     </div>
                   )}
                   
-                  {/* Steps (only if multi-step detected) */}
                   {assistResult.flags?.multi_step && assistResult.steps?.length > 0 && (
-                    <div className="pt-2 border-t border-gray-50 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                      <h4 className="font-medium mb-2 text-indigo-600 uppercase tracking-wider text-[10px]">
+                    <div className="animate-in fade-in slide-in-from-bottom-3 duration-500">
+                      <h4 className="font-bold text-[11px] uppercase tracking-widest text-emerald-700 mb-3 flex items-center gap-2">
+                        <div className="h-1 w-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
                         Steps
                       </h4>
-                      <ol className="list-decimal pl-5 space-y-2">
+                      <ol className="space-y-2">
                         {assistResult.steps.map((step, i) => (
-                          <li key={i} className="bg-green-50/60 p-2 rounded-lg">
-                            {renderTextWithHighlights(step, simplifiedDone)}
+                          <li key={i} className="flex items-start gap-3 bg-gradient-to-r from-emerald-50/70 to-teal-50/50 p-3 rounded-xl border border-emerald-100/40">
+                            <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xs font-bold shadow-sm">
+                              {i + 1}
+                            </span>
+                            <span className="text-slate-700 text-sm leading-relaxed flex-1">{renderTextWithHighlights(step, simplifiedDone)}</span>
                           </li>
                         ))}
                       </ol>
@@ -499,32 +476,44 @@ const Dashboard = () => {
                   )}
     
                   {loadingMermaid && (
-                    <div className="text-xs text-gray-400 italic mt-3">
+                    <div className="flex items-center gap-2 text-xs text-indigo-600 italic px-2">
+                      <div className="h-1 w-1 rounded-full bg-indigo-400 animate-pulse"></div>
                       Generating visual explanation…
                     </div>
                   )}
 
                   {mermaidDiagram && (
-                    <MermaidDiagram diagram={mermaidDiagram} />
+                    <div className="mt-4">
+                      <MermaidDiagram diagram={mermaidDiagram} />
+                    </div>
                   )}
 
                 </div>
               ) : (
-                /* Combined loading and empty state to fix the double message */
-                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                  <div className={`mb-4 ${loadingAssist ? "animate-pulse" : ""}`}>
-                    <HelpCircle size={40} className="opacity-20" />
+                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                  <div className={`mb-4 ${loadingAssist ? "animate-pulse" : "animate-bounce"}`}>
+                    <div className="relative">
+                      <HelpCircle size={48} className="opacity-20" strokeWidth={1.5} />
+                      {loadingAssist && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-12 h-12 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm italic">
-                    {loadingAssist ? "Gemini is distilling the conversation..." : "Waiting for content to begin…"}
+                  <p className="text-sm font-medium">
+                    {loadingAssist ? "Gemini is processing..." : "Ready to listen"}
+                  </p>
+                  <p className="text-xs opacity-60 mt-1">
+                    {loadingAssist ? "Distilling conversation insights" : "Start recording to begin"}
                   </p>
                 </div>
               )}
             </div>
 
-            {/* 🧠 Ask AI Context Bar */}
-            <div className="mt-4 border-t pt-4">
-              <h4 className="text-[10px] uppercase tracking-wider text-indigo-600 mb-2">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-md shadow-indigo-100/40 border border-indigo-100/30 p-4">
+              <h4 className="font-bold text-[11px] uppercase tracking-widest text-indigo-700 mb-3 flex items-center gap-2">
+                <div className="h-1 w-6 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full"></div>
                 Ask AuraSync
               </h4>
 
@@ -534,7 +523,7 @@ const Dashboard = () => {
                   value={contextQuery}
                   onChange={(e) => setContextQuery(e.target.value)}
                   placeholder="Ask for clarification, examples, or simplification…"
-                  className="flex-1 px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  className="flex-1 px-4 py-2.5 rounded-xl border-2 border-indigo-100 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 transition-all bg-white/50 placeholder:text-slate-400"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleContextQuery();
                   }}
@@ -543,35 +532,32 @@ const Dashboard = () => {
                 <button
                   onClick={handleContextQuery}
                   disabled={loadingContextQuery}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-medium shadow-md shadow-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/40 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all duration-200"
                 >
                   {loadingContextQuery ? "Thinking…" : "Ask"}
                 </button>
               </div>
             </div>
 
-            {/* Profile ID */}
             {profileId && (
-              <div className="text-[10px] text-gray-400 uppercase tracking-widest px-2">
-                Session ID: <code>{profileId}</code>
+              <div className="text-[10px] text-slate-400 uppercase tracking-widest px-2 font-mono">
+                Session: <span className="text-indigo-400">{profileId}</span>
               </div>
             )}
           </section>
 
-          {/* ───── Right: Controls ───── */}
-          <aside className="space-y-6">
+          <aside className="lg:col-span-4 space-y-4">
 
-            {/* Pacing Controls */}
-            <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-semibold">Reading Pacing</h3>
-                <span className="text-xs font-medium px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full">
-                  {speed < 33 ? "Slow & Steady" : speed < 66 ? "Standard" : "Fast"}
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg shadow-indigo-100/50 border border-indigo-100/30 p-5">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-slate-800 text-base">Reading Pace</h3>
+                <span className="text-[10px] font-bold px-3 py-1 bg-gradient-to-r from-indigo-100 to-violet-100 text-indigo-700 rounded-full uppercase tracking-wide">
+                  {speed < 33 ? "Slow" : speed < 66 ? "Standard" : "Fast"}
                 </span>
               </div>
 
-              <label className="text-sm block">
-                <div className="flex justify-between text-[10px] text-gray-400 uppercase mb-1">
+              <div className="space-y-3">
+                <div className="flex justify-between text-[10px] text-slate-500 uppercase tracking-wider font-medium">
                   <span>Slow</span>
                   <span>Fast</span>
                 </div>
@@ -580,71 +566,80 @@ const Dashboard = () => {
                   min="0"
                   max="100"
                   value={speed}
-                  onChange={(e) => setSpeed(Number(e.target.value))} // Ensure it's a number
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  onChange={(e) => setSpeed(Number(e.target.value))}
+                  className="w-full h-2 bg-gradient-to-r from-indigo-100 to-violet-100 rounded-full appearance-none cursor-pointer accent-indigo-600 hover:accent-indigo-700 transition-all"
+                  style={{
+                    background: `linear-gradient(to right, rgb(99 102 241) 0%, rgb(99 102 241) ${speed}%, rgb(224 231 255) ${speed}%, rgb(224 231 255) 100%)`
+                  }}
                 />
-              </label>
+              </div>
 
               <button
                 onClick={() => setPaused(!paused)}
-                className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl border transition-colors ${
-                  paused ? "bg-amber-50 border-amber-200 text-amber-700" : "hover:bg-gray-100"
-                }`}
+                className={`w-full mt-4 flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 shadow-sm ${
+                  paused 
+                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-amber-500/30 hover:shadow-lg hover:shadow-amber-500/40" 
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                } hover:scale-105 active:scale-95`}
               >
-                {paused ? <Play size={18} /> : <Pause size={18} />}
-                {paused ? "Resume Processing" : "Pause Stream"}
+                {paused ? <Play size={18} strokeWidth={2.5} /> : <Pause size={18} strokeWidth={2.5} />}
+                {paused ? "Resume" : "Pause"}
               </button>
             </div>
 
-            {/* Context Tools */}
-            <div className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
-              <h3 className="font-semibold">Context</h3>
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg shadow-indigo-100/50 border border-indigo-100/30 p-5">
+              <h3 className="font-bold text-slate-800 mb-4 text-base">Audio Control</h3>
               <button
                 onClick={recording ? stopRecording : startRecording}
-                className={`w-full py-2 rounded-xl border ${
+                className={`w-full py-3 rounded-xl font-bold text-sm transition-all duration-200 shadow-md ${
                   recording
-                    ? "bg-red-50 border-red-300 text-red-700"
-                    : "hover:bg-gray-100"
-                }`}
+                    ? "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-red-500/30 hover:shadow-lg hover:shadow-red-500/40 animate-pulse"
+                    : "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/40"
+                } hover:scale-105 active:scale-95`}
               >
-                {recording ? "Stop Listening" : "Start Listening"}
+                <span className="flex items-center justify-center gap-2">
+                  {recording && <span className="h-2 w-2 rounded-full bg-white animate-pulse"></span>}
+                  {recording ? "Stop Listening" : "Start Listening"}
+                </span>
               </button>
             </div>
 
-            {/* Preferences */}
-            <div className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
-              <h3 className="font-semibold">Preferences</h3>
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg shadow-indigo-100/50 border border-indigo-100/30 p-5">
+              <h3 className="font-bold text-slate-800 mb-4 text-base">Preferences</h3>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={allowVisuals}
-                  onChange={(e) => setAllowVisuals(e.target.checked)}
-                />
-                Visual aids
-              </label>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 text-sm text-slate-700 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={allowVisuals}
+                    onChange={(e) => setAllowVisuals(e.target.checked)}
+                    className="w-5 h-5 rounded-md border-2 border-indigo-300 text-indigo-600 focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1 transition-all cursor-pointer"
+                  />
+                  <span className="group-hover:text-indigo-700 transition-colors font-medium">Visual aids</span>
+                </label>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={textOnly}
-                  onChange={(e) => setTextOnly(e.target.checked)}
-                />
-                Text-only mode
-              </label>
+                <label className="flex items-center gap-3 text-sm text-slate-700 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={textOnly}
+                    onChange={(e) => setTextOnly(e.target.checked)}
+                    className="w-5 h-5 rounded-md border-2 border-indigo-300 text-indigo-600 focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1 transition-all cursor-pointer"
+                  />
+                  <span className="group-hover:text-indigo-700 transition-colors font-medium">Text-only mode</span>
+                </label>
+              </div>
             </div>
 
           </aside>
         </div>
       </main>
 
-      {/* ───────────────── Bottom Action Bar (Mobile) ───────────────── */}
-      <div className="sticky bottom-0 bg-white border-t p-4 flex gap-3 lg:hidden">
-        <button className="flex-1 py-3 rounded-xl bg-indigo-600 text-white">
+      <div className="sticky bottom-0 bg-white/90 backdrop-blur-xl border-t border-indigo-100/50 p-3 flex gap-2 lg:hidden shadow-lg">
+        <button className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 active:scale-95 transition-all">
           Start Processing
         </button>
-        <button className="p-3 rounded-xl border">
-          <RotateCcw size={18} />
+        <button className="p-3 rounded-xl border-2 border-indigo-200 bg-white text-indigo-600 hover:bg-indigo-50 active:scale-95 transition-all">
+          <RotateCcw size={20} strokeWidth={2.5} />
         </button>
       </div>
     </div>

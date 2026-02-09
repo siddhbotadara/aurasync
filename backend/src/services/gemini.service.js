@@ -4,7 +4,7 @@ dotenv.config();
 import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_SIDDH_API_5
+  apiKey: process.env.GEMINI_SIDDH_API_7
 });
 
 export async function processWithGemini({ text, userProfile }) {
@@ -237,17 +237,57 @@ REWRITE IT before returning JSON.
   ];
 
   // 🧠 SPEAKER SANITY CHECK (CRITICAL)
+  // 🧠 Balanced Speaker Normalization (Middle Ground)
+
   if (Array.isArray(result.speakerSegments)) {
-    const uniqueSpeakers = new Set(
-      result.speakerSegments.map(s => s.speaker)
+    const MAX_SPEAKERS = 4;
+    const MIN_CHARS = 20;
+
+    // Remove junk
+    let segments = result.speakerSegments.filter(
+      s => s.text && s.text.trim().length >= MIN_CHARS
     );
 
-    // ❌ If only one speaker OR no clear turn-taking → disable speaker mode
-    if (uniqueSpeakers.size < 2) {
+    // Count speakers
+    const speakerMap = {};
+    segments.forEach(s => {
+      speakerMap[s.speaker] = (speakerMap[s.speaker] || 0) + 1;
+    });
+
+    let speakers = Object.keys(speakerMap);
+
+    // 🚨 If too many speakers → MERGE minor ones
+    if (speakers.length > MAX_SPEAKERS) {
+      const sorted = speakers.sort(
+        (a, b) => speakerMap[b] - speakerMap[a]
+      );
+
+      const keep = new Set(sorted.slice(0, MAX_SPEAKERS - 1));
+      const MERGED_NAME = "Team Member";
+
+      segments = segments.map(seg => {
+        if (!keep.has(seg.speaker)) {
+          return {
+            ...seg,
+            speaker: MERGED_NAME
+          };
+        }
+        return seg;
+      });
+    }
+
+    // Recount after merge
+    const finalSpeakers = new Set(
+      segments.map(s => s.speaker)
+    );
+
+    // 🚫 If still meaningless → collapse
+    if (finalSpeakers.size < 2) {
       result.speakerSegments = [];
+    } else {
+      result.speakerSegments = segments;
     }
   }
-
 
   // ─────────────────────────────
   // 🧼 STRONG POST-VALIDATION
