@@ -4,7 +4,7 @@ dotenv.config();
 import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_SIDDH_API_4
+  apiKey: process.env.GEMINI_SIDDH_API_5
 });
 
 export async function processWithGemini({ text, userProfile }) {
@@ -319,4 +319,52 @@ REWRITE IT before returning JSON.
   });
 
   return result;
+}
+
+
+// Clarification (again)
+export async function processContextQuery({ query, previousResult }) {
+  const prompt = `
+You are continuing a conversation for a user with Auditory Processing Disorder (APD).
+
+The user already received this explanation:
+"${previousResult.simplified}"
+
+Key points:
+${previousResult.keyPoints.join("\n")}
+
+The user now asks:
+"${query}"
+
+Rules:
+- Do NOT repeat everything
+- Expand only what is asked
+- Use simple, calm teacher tone
+- Use examples ONLY if asked
+- Keep it short and focused
+
+Return JSON:
+{
+  "simplified": "",
+  "keyPoints": [],
+  "steps": [],
+  "hardWords": {}
+}
+`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }]
+      }
+    ]
+  });
+
+  const raw = response.text;
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("Invalid Gemini context response");
+
+  return JSON.parse(match[0]);
 }

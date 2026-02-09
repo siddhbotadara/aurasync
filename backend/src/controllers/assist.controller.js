@@ -1,5 +1,5 @@
 import UserProfile from "../models/UserProfile.js";
-import { processWithGemini } from "../services/gemini.service.js";
+import { processWithGemini, processContextQuery} from "../services/gemini.service.js";
 
 export async function assistUser(request, reply) {
   try {
@@ -29,6 +29,30 @@ export async function assistUser(request, reply) {
     request.log.error(error);
     return reply.code(500).send({
       error: "Failed to process assistance request"
+    });
+  }
+}
+
+export async function assistUserContext(request, reply) {
+  try {
+    const { query, previousResult } = request.body;
+
+    if (!query || !previousResult) {
+      return reply.code(400).send({
+        error: "query and previousResult are required"
+      });
+    }
+
+    const result = await processContextQuery({
+      query,
+      previousResult
+    });
+
+    return reply.send(result);
+  } catch (err) {
+    request.log.error(err);
+    return reply.code(500).send({
+      error: "Failed to process context request"
     });
   }
 }

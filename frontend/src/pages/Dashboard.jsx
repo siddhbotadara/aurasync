@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { requestAssist } from "../services/assist.api.js";
 import { useTypewriter } from "../hooks/useTypewriter.js";
+import MermaidDiagram from "../components/MermaidDiagram";
 
 import {
   Settings,
@@ -50,6 +51,12 @@ const Dashboard = () => {
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState(50);
 
+  const [contextQuery, setContextQuery] = useState("");
+  const [loadingContextQuery, setLoadingContextQuery] = useState(false);
+
+  const [mermaidDiagram, setMermaidDiagram] = useState(null);
+  const [loadingMermaid, setLoadingMermaid] = useState(false);
+
   const [transcriptChunk, setTranscriptChunk] = useState("");
   const [assistResult, setAssistResult] = useState(null);
   const [loadingAssist, setLoadingAssist] = useState(false);
@@ -64,6 +71,10 @@ const Dashboard = () => {
   const animationDelay = Math.max(20, 200 - speed * 1.8);
 
   const usedHardWordsRef = React.useRef(new Set());
+
+  const [textOnly, setTextOnly] = useState(true);
+
+  const [allowVisuals, setAllowVisuals] = useState(true);
 
   const hasSpeakers =
     Array.isArray(assistResult?.speakerSegments) &&
@@ -143,6 +154,44 @@ const Dashboard = () => {
     });
   };
 
+  const handleContextQuery = async () => {
+    if (!contextQuery.trim() || !assistResult || !profileId) return;
+
+    try {
+      setLoadingContextQuery(true);
+
+      const res = await fetch("http://localhost:3000/api/assist/context", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId,
+          query: contextQuery,
+          previousResult: assistResult, // ✅ FULL OBJECT
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text);
+      }
+
+      const data = await res.json();
+
+      setAssistResult({
+        ...data,
+        _rawSimplified: data.simplified,
+      });
+
+      setContextQuery("");
+      usedHardWordsRef.current.clear();
+    } catch (err) {
+      console.error("Context query failed:", err);
+      alert("AI could not process the request");
+    } finally {
+      setLoadingContextQuery(false);
+    }
+  };
+
   useEffect(() => {
     const id = localStorage.getItem("aurasync_profile_id");
     setProfileId(id);
@@ -159,6 +208,45 @@ const Dashboard = () => {
     }
   }, [assistResult]);
 
+  useEffect(() => {
+    if (!assistResult?.simplified) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoadingMermaid(true);
+        setMermaidDiagram(null);
+
+        const res = await fetch("http://localhost:3000/api/mermaid", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            simplified: assistResult.simplified,
+            keyPoints: assistResult.keyPoints || [],
+            userPreferences: {
+              allowVisuals,
+            },
+          }),
+        });
+
+        const data = await res.json();
+
+        // 🧠 RESPECT AGENT DECISION
+        if (!cancelled && data.visualIntent !== "NONE" && data.diagram) {
+          setMermaidDiagram(data.diagram);
+        }
+      } catch (err) {
+        console.error("Mermaid auto-trigger failed", err);
+      } finally {
+        if (!cancelled) setLoadingMermaid(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assistResult]);
 
   // 🎤 Start mic recording
   const startRecording = async () => {
@@ -269,7 +357,7 @@ const Dashboard = () => {
       setLoadingAssist(false);
     }
   };
-
+  
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 flex flex-col">
 
@@ -409,6 +497,17 @@ const Dashboard = () => {
                       </ol>
                     </div>
                   )}
+    
+                  {loadingMermaid && (
+                    <div className="text-xs text-gray-400 italic mt-3">
+                      Generating visual explanation…
+                    </div>
+                  )}
+
+                  {mermaidDiagram && (
+                    <MermaidDiagram diagram={mermaidDiagram} />
+                  )}
+
                 </div>
               ) : (
                 /* Combined loading and empty state to fix the double message */
@@ -421,6 +520,34 @@ const Dashboard = () => {
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* 🧠 Ask AI Context Bar */}
+            <div className="mt-4 border-t pt-4">
+              <h4 className="text-[10px] uppercase tracking-wider text-indigo-600 mb-2">
+                Ask AuraSync
+              </h4>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={contextQuery}
+                  onChange={(e) => setContextQuery(e.target.value)}
+                  placeholder="Ask for clarification, examples, or simplification…"
+                  className="flex-1 px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleContextQuery();
+                  }}
+                />
+
+                <button
+                  onClick={handleContextQuery}
+                  disabled={loadingContextQuery}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm disabled:opacity-50"
+                >
+                  {loadingContextQuery ? "Thinking…" : "Ask"}
+                </button>
+              </div>
             </div>
 
             {/* Profile ID */}
@@ -482,32 +609,27 @@ const Dashboard = () => {
               >
                 {recording ? "Stop Listening" : "Start Listening"}
               </button>
-            <button
-              onClick={handleAssistClick}
-              disabled={loadingAssist}
-              className="w-full py-2 rounded-xl border hover:bg-gray-100"
-            >
-              {loadingAssist ? "Thinking…" : "Recap / How did we get here?"}
-            </button>
             </div>
 
             {/* Preferences */}
             <div className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
               <h3 className="font-semibold">Preferences</h3>
 
-              <select className="w-full border rounded-xl p-2">
-                <option>Low simplification</option>
-                <option>Medium simplification</option>
-                <option>High simplification</option>
-              </select>
-
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" />
+                <input
+                  type="checkbox"
+                  checked={allowVisuals}
+                  onChange={(e) => setAllowVisuals(e.target.checked)}
+                />
                 Visual aids
               </label>
 
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" />
+                <input
+                  type="checkbox"
+                  checked={textOnly}
+                  onChange={(e) => setTextOnly(e.target.checked)}
+                />
                 Text-only mode
               </label>
             </div>
