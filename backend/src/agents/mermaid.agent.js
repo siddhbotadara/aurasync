@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_SIDDH_API_7
+  apiKey: process.env.GEMINI_FINAL_KEY
 });
 
 export async function generateMermaidDiagram({ simplified, keyPoints, type = "FLOWCHART" }) {
