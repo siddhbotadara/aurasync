@@ -29,7 +29,7 @@ await app.register(cors, {
     }
 
     // Allow local dev
-    if (origin === "http://localhost:5173") {
+    if (origin === "http://localhost:5173" || origin?.endsWith('.vercel.app')) {
       return cb(null, true);
     }
 
