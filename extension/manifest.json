@@ -24,7 +24,10 @@
 
   "permissions": [
     "storage",
-    "sidePanel"
+    "sidePanel",
+    "activeTab",
+    "tabs",
+    "tabCapture"
   ],
 
   "host_permissions": [

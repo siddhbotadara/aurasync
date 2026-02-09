@@ -32,6 +32,21 @@ const getToneColor = (tone) => {
   }
 };
 
+const DEFAULT_API_BASE_URL = "http://localhost:3000/api";
+
+function getApiBaseUrl() {
+  const configured = import.meta.env.VITE_API_BASE_URL;
+  const resolved = configured && typeof configured === "string"
+    ? configured
+    : DEFAULT_API_BASE_URL;
+  return resolved.replace(/\/+$/, "");
+}
+
+function buildApiUrl(path) {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${getApiBaseUrl()}${cleanPath}`;
+}
+
 function arrayBufferToBase64(buffer) {
   let binary = "";
   const bytes = new Uint8Array(buffer);
@@ -44,6 +59,92 @@ function arrayBufferToBase64(buffer) {
   }
 
   return btoa(binary);
+}
+
+function truncateLabel(text, maxWords = 8, maxChars = 56) {
+  if (!text || typeof text !== "string") return "";
+
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+
+  const words = normalized.split(" ").filter(Boolean);
+  const byWord = words.slice(0, maxWords).join(" ");
+  const clipped = byWord.length > maxChars
+    ? `${byWord.slice(0, maxChars - 1).trim()}...`
+    : byWord;
+
+  return clipped.replace(/"/g, "'");
+}
+
+function normalizeMermaidDiagram(rawDiagram) {
+  if (!rawDiagram || typeof rawDiagram !== "string") return null;
+
+  const withoutFences = rawDiagram
+    .replace(/```mermaid/gi, "")
+    .replace(/```/g, "")
+    .trim();
+
+  if (!withoutFences || /^none$/i.test(withoutFences)) {
+    return null;
+  }
+
+  const lines = withoutFences
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const diagramStart = lines.findIndex((line) =>
+    /^(flowchart|graph)\b/i.test(line)
+  );
+
+  if (diagramStart === -1) {
+    return null;
+  }
+
+  const normalized = lines.slice(diagramStart).join("\n");
+  return normalized || null;
+}
+
+function isDiagramDense(diagram) {
+  if (!diagram) return true;
+
+  if (diagram.length > 2200) return true;
+
+  const quotedLabels = [...diagram.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  return quotedLabels.some((label) => label.length > 90);
+}
+
+function buildFallbackDiagram({ simplified, keyPoints }) {
+  const labels = [];
+
+  if (simplified) {
+    labels.push(truncateLabel(simplified, 9, 62));
+  }
+
+  if (Array.isArray(keyPoints)) {
+    keyPoints.forEach((point) => {
+      const compact = truncateLabel(point, 8, 56);
+      if (compact) labels.push(compact);
+    });
+  }
+
+  const unique = [...new Set(labels.filter(Boolean))].slice(0, 5);
+
+  if (unique.length === 0) {
+    return null;
+  }
+
+  const lines = ["flowchart TD"];
+
+  unique.forEach((label, index) => {
+    lines.push(`N${index}["${label}"]`);
+  });
+
+  for (let i = 1; i < unique.length; i += 1) {
+    lines.push(`N${i - 1} --> N${i}`);
+  }
+
+  return lines.join("\n");
 }
 
 const Dashboard = () => {
@@ -65,6 +166,9 @@ const Dashboard = () => {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   
   const audioChunksRef = React.useRef([]);
+  const mediaStreamRef = React.useRef(null);
+  const monitorContextRef = React.useRef(null);
+  const monitorSourceRef = React.useRef(null);
 
   const navigate = useNavigate();
 
@@ -154,7 +258,7 @@ const Dashboard = () => {
     try {
       setLoadingContextQuery(true);
 
-      const res = await fetch("http://localhost:3000/api/assist/context", {
+      const res = await fetch(buildApiUrl("/assist/context"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -203,16 +307,30 @@ const Dashboard = () => {
   }, [assistResult]);
 
   useEffect(() => {
-    if (!assistResult?.simplified) return;
+    if (!assistResult?.simplified) {
+      setLoadingMermaid(false);
+      setMermaidDiagram(null);
+      return;
+    }
+
+    if (!allowVisuals) {
+      setLoadingMermaid(false);
+      setMermaidDiagram(null);
+      return;
+    }
 
     let cancelled = false;
+    const fallbackDiagram = buildFallbackDiagram({
+      simplified: assistResult.simplified,
+      keyPoints: assistResult.keyPoints || [],
+    });
 
     (async () => {
       try {
         setLoadingMermaid(true);
         setMermaidDiagram(null);
 
-        const res = await fetch("http://localhost:3000/api/mermaid", {
+        const res = await fetch(buildApiUrl("/mermaid"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -224,13 +342,26 @@ const Dashboard = () => {
           }),
         });
 
-        const data = await res.json();
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `Request failed (${res.status})`);
+        }
 
-        if (!cancelled && data.visualIntent !== "NONE" && data.diagram) {
-          setMermaidDiagram(data.diagram);
+        const data = await res.json();
+        const normalizedRemote = normalizeMermaidDiagram(data?.diagram);
+        const finalDiagram =
+          normalizedRemote && !isDiagramDense(normalizedRemote)
+            ? normalizedRemote
+            : fallbackDiagram;
+
+        if (!cancelled) {
+          setMermaidDiagram(finalDiagram || null);
         }
       } catch (err) {
         console.error("Mermaid auto-trigger failed", err);
+        if (!cancelled) {
+          setMermaidDiagram(fallbackDiagram || null);
+        }
       } finally {
         if (!cancelled) setLoadingMermaid(false);
       }
@@ -239,26 +370,132 @@ const Dashboard = () => {
     return () => {
       cancelled = true;
     };
-  }, [assistResult]);
+  }, [assistResult, allowVisuals]);
+
+  const isExtensionContext = () =>
+    typeof chrome !== "undefined" && Boolean(chrome?.runtime?.id);
+
+  const cleanupCapturedAudio = async () => {
+    try {
+      if (monitorSourceRef.current) {
+        monitorSourceRef.current.disconnect();
+      }
+    } catch (err) {
+      console.warn("Failed to disconnect monitor source", err);
+    } finally {
+      monitorSourceRef.current = null;
+    }
+
+    try {
+      if (monitorContextRef.current) {
+        await monitorContextRef.current.close();
+      }
+    } catch (err) {
+      console.warn("Failed to close monitor context", err);
+    } finally {
+      monitorContextRef.current = null;
+    }
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+  };
+
+  const attachTabAudioMonitor = async (stream) => {
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) return;
+
+    try {
+      const context = new AudioContextCtor();
+      const source = context.createMediaStreamSource(stream);
+      source.connect(context.destination);
+      if (context.state === "suspended") {
+        await context.resume();
+      }
+      monitorContextRef.current = context;
+      monitorSourceRef.current = source;
+    } catch (err) {
+      console.warn("Unable to mirror captured tab audio", err);
+    }
+  };
+
+  const captureTabAudioStream = async () => {
+    return new Promise((resolve, reject) => {
+      if (!chrome?.tabCapture?.capture) {
+        reject(new Error("tabCapture API unavailable"));
+        return;
+      }
+
+      chrome.tabCapture.capture(
+        { audio: true, video: false },
+        async (stream) => {
+          const runtimeError = chrome.runtime?.lastError;
+          if (runtimeError) {
+            reject(new Error(runtimeError.message));
+            return;
+          }
+
+          if (!stream) {
+            reject(new Error("Failed to capture tab audio stream"));
+            return;
+          }
+
+          await attachTabAudioMonitor(stream);
+          resolve(stream);
+        }
+      );
+    });
+  };
+
+  const getRecordingStream = async () => {
+    if (isExtensionContext() && chrome?.tabCapture?.capture) {
+      return captureTabAudioStream();
+    }
+    return navigator.mediaDevices.getUserMedia({ audio: true });
+  };
+
+  const getMediaRecorderOptions = () => {
+    if (
+      typeof MediaRecorder.isTypeSupported === "function" &&
+      MediaRecorder.isTypeSupported("audio/webm")
+    ) {
+      return { mimeType: "audio/webm" };
+    }
+    if (
+      typeof MediaRecorder.isTypeSupported === "function" &&
+      MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+    ) {
+      return { mimeType: "audio/webm;codecs=opus" };
+    }
+    return {};
+  };
 
   const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    try {
+      const stream = await getRecordingStream();
+      mediaStreamRef.current = stream;
 
-    const recorder = new MediaRecorder(stream, {
-      mimeType: "audio/webm",
-    });
+      const recorder = new MediaRecorder(stream, getMediaRecorderOptions());
+      audioChunksRef.current = [];
 
-    audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
 
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        audioChunksRef.current.push(e.data);
-      }
-    };
-
-    recorder.start();
-    setMediaRecorder(recorder);
-    setRecording(true);
+      recorder.start();
+      setMediaRecorder(recorder);
+      setRecording(true);
+    } catch (err) {
+      console.error(err);
+      alert(
+        isExtensionContext()
+          ? "Unable to capture live tab audio. Make sure audio is playing in the active tab."
+          : "Unable to start microphone recording."
+      );
+    }
   };
 
   const stopRecording = () => {
@@ -268,40 +505,53 @@ const Dashboard = () => {
 
     mediaRecorder.onstop = async () => {
       try {
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const recorderType = mediaRecorder.mimeType || "audio/webm";
+        const blob = new Blob(audioChunksRef.current, { type: recorderType });
+        const normalizedMimeType =
+          (blob.type || recorderType || "audio/webm").split(";")[0] || "audio/webm";
+        await cleanupCapturedAudio();
 
         if (blob.size === 0) {
-          alert("No audio captured. Please speak and try again.");
+          alert(
+            isExtensionContext()
+              ? "No tab audio captured. Play audio in the active tab and try again."
+              : "No audio captured. Please speak and try again."
+          );
           return;
         }
 
         const arrayBuffer = await blob.arrayBuffer();
         const base64Audio = arrayBufferToBase64(arrayBuffer);
 
-
-        const onboarding =
-          JSON.parse(localStorage.getItem("aurasync_profile")) || {
-            comprehensionBreak: "Long explanations are hard",
-            learningPreference: "Step by step",
-            listeningThought: "I lose focus quickly",
-            struggleNote: "Technical lectures",
-          };
+        const onboardingRaw = localStorage.getItem("aurasync_profile");
+        const parsedProfile = onboardingRaw ? JSON.parse(onboardingRaw) : null;
+        const onboarding = parsedProfile?.onboarding || parsedProfile || {
+          comprehensionBreak: "Long explanations are hard",
+          learningPreference: "Step by step",
+          listeningThought: "I lose focus quickly",
+          struggleNote: "Technical lectures",
+        };
 
         setLoadingAssist(true);
 
-        const res = await fetch("http://localhost:3000/api/audio/process", {
+        const res = await fetch(buildApiUrl("/audio/process"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             audio: base64Audio,
-            mimeType: "audio/webm",
+            mimeType: normalizedMimeType,
             userProfile: { onboarding },
           }),
         });
 
         if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text);
+          const rawError = await res.text();
+          let parsedError = rawError;
+          try {
+            const parsed = JSON.parse(rawError);
+            parsedError = parsed?.error || rawError;
+          } catch (_parseErr) {}
+          throw new Error(parsedError || `Request failed (${res.status})`);
         }
 
         const data = await res.json();
@@ -309,19 +559,29 @@ const Dashboard = () => {
         setTranscriptChunk(data.transcript);
         setAssistResult({
           ...data.aiResult,
-          _rawSimplified: data.aiResult.simplified
+          _rawSimplified: data.aiResult.simplified,
         });
         usedHardWordsRef.current.clear();
       } catch (err) {
         console.error(err);
-        alert("Audio processing failed");
+        alert(`Audio processing failed: ${err?.message || "Unknown error"}`);
       } finally {
         setLoadingAssist(false);
+        setMediaRecorder(null);
+        audioChunksRef.current = [];
       }
     };
 
     mediaRecorder.stop();
   };
+
+  useEffect(() => {
+    return () => {
+      cleanupCapturedAudio().catch((err) => {
+        console.warn("Failed to cleanup audio capture on unmount", err);
+      });
+    };
+  }, []);
 
   const handleAssistClick = async () => {
     if (!profileId || !transcriptChunk) return;
