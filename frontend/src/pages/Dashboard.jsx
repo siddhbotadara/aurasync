@@ -626,9 +626,23 @@ const Dashboard = () => {
             </button>
             <button
               onClick={resetProfile}
-              className="ml-2 px-4 py-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white text-sm font-medium shadow-md shadow-rose-500/25 hover:shadow-lg hover:shadow-rose-500/35 hover:scale-105 active:scale-95 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2"
+              className="
+                ml-2
+                px-3 py-1.5
+                rounded-xl
+                bg-gradient-to-r from-rose-500 to-pink-600
+                text-white
+                text-xs sm:text-sm
+                font-medium
+                shadow-md shadow-rose-500/25
+                hover:shadow-lg hover:shadow-rose-500/35
+                active:scale-95
+                transition-all
+                whitespace-nowrap
+              "
             >
-              New Session
+              <span className="hidden sm:inline">New Session</span>
+              <span className="sm:hidden">Reset</span>
             </button>
           </div>
         </div>
@@ -847,7 +861,7 @@ const Dashboard = () => {
               </button>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg shadow-indigo-100/50 border border-indigo-100/30 p-5">
+            <div className="hidden lg:block bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg shadow-indigo-100/50 border border-indigo-100/30 p-5">
               <h3 className="font-bold text-slate-800 mb-4 text-base">Audio Control</h3>
               <button
                 onClick={recording ? stopRecording : startRecording}
@@ -894,12 +908,22 @@ const Dashboard = () => {
         </div>
       </main>
 
-      <div className="sticky bottom-0 bg-white/90 backdrop-blur-xl border-t border-indigo-100/50 p-3 flex gap-2 lg:hidden shadow-lg">
-        <button className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 active:scale-95 transition-all">
-          Start Processing
-        </button>
-        <button className="p-3 rounded-xl border-2 border-indigo-200 bg-white text-indigo-600 hover:bg-indigo-50 active:scale-95 transition-all">
-          <RotateCcw size={20} strokeWidth={2.5} />
+      {/* Mobile bottom recording bar */}
+      <div className="sticky bottom-0 bg-white/90 backdrop-blur-xl border-t border-indigo-100/50 p-3 lg:hidden shadow-lg z-40">
+        <button
+          onClick={recording ? stopRecording : startRecording}
+          className={`w-full py-3 rounded-xl font-bold text-sm transition-all duration-200 shadow-lg ${
+            recording
+              ? "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-red-500/30 animate-pulse"
+              : "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-indigo-500/30"
+          } active:scale-95`}
+        >
+          <span className="flex items-center justify-center gap-2">
+            {recording && (
+              <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
+            )}
+            {recording ? "Stop Listening" : "Start Listening"}
+          </span>
         </button>
       </div>
     </div>
