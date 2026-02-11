@@ -7,6 +7,7 @@ import assistRoutes from "./routes/assist.route.js";
 import audioRoutes from "./routes/audio.routes.js";
 import cors from '@fastify/cors' 
 import mermaidRoutes from "./routes/mermaid.routes.js";
+import healthRoutes from "./routes/health.route.js";
 
 const app = Fastify({
   logger:true,
@@ -48,5 +49,6 @@ app.register(audioRoutes, { prefix: process.env.ROUTE_API});
 app.register(onboardingRoutes, {prefix: process.env.ROUTE_API});
 app.register(assistRoutes, { prefix: process.env.ROUTE_API});
 app.register(mermaidRoutes, { prefix: process.env.ROUTE_API});
+app.register(healthRoutes, {prefix: process.env.ROUTE_API});
 
 export default app;
